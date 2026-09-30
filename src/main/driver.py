@@ -12,19 +12,19 @@ def split_map(map_data):
     for row in range(map_data.rows):
         for column in range(map_data.columns):
             tile = map_data.tiles[row][column]
-            if tile == "#":
+            if tile == "#": # wall
                 static_map[row][column] = "#"
             elif tile == "@":
-                items[row][column] = "@"
+                items[row][column] = "@" # player 
             elif tile == "$":
-                items[row][column] = "$"
-            elif tile == ".":
-                static_map[row][column] = "."
+                items[row][column] = "$"  # box
+            elif tile == ".": 
+                static_map[row][column] = "." # target
             elif tile == "+":
-                static_map[row][column] = "."
+                static_map[row][column] = "." # player on the goal
                 items[row][column] = "@"
             elif tile == "*":
-                static_map[row][column] = "."
+                static_map[row][column] = "." # box on the goal
                 items[row][column] = "$"
 
     return static_map, items
