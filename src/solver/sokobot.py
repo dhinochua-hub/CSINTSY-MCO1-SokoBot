@@ -24,6 +24,7 @@ class SokoBot:
                         player = (y,x) # store position of player
                     elif itemsData[y][x] == '$': # check for crate symbol
                         crates.append((y,x)) # add crate position
+            initialCrates = tuple(sorted(crates)) # store initial position
 
             MOVES = ((0, 1), (1, 0), (0, -1), (-1, 0)) # movement offsets
             MOVE_CHARS = {(0, 1): 'r', (1, 0): 'd', (0, -1): 'l', (-1, 0): 'u'} # translated moves
@@ -32,7 +33,7 @@ class SokoBot:
             def isGoal(state): 
                 return set(state[1] == targets) # check if crate set is in the target set
             
-            def move(state, move):
+            def doMove(state, move):
                 dy, dx = move
                 py, px = state[0] # player coords
                 ny, nx = py+dy, px+dx # new coords
@@ -58,6 +59,30 @@ class SokoBot:
 
                 updatedCrates = tuple(sorted(crateSet)) # store updated crate state
                 return ((ny, nx), updatedCrates) # return tuple of new states
+
+            def dfsID(depthLimit): # main algorithm
+                start = (player, initialCrates) # starting state
+                stack = [(start), []] # state and path
+                visited = {start} # set of visited states
+
+                while stack:
+                    if time.time() - startTime > TIME_LIMIT: # check if out of time
+                        return None # return no solution if bot was thinking for too long :(
+
+                    state, path = stack.pop()
+
+                    if isGoal(state): # check if solution found
+                        return path 
+
+                    if len(path) < depthLimit: # only do til depth limit
+                        for move in MOVES:
+                            child = doMove(state, move) # next move
+                            if child is not None and not visited: # if valid move and not yet visited
+                                visited.add(child)
+                                stack.append((child, path+[MOVE_CHARS[move]])) # add the new state and built path
+                                
+                return None # did not find solution
+
 
 
                             
