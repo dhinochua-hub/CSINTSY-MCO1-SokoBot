@@ -31,7 +31,7 @@ class SokoBot:
 
             # NOTE: state[0] is player state and state[1] is crate state
             def isGoal(state): 
-                return set(state[1] == targets) # check if crate set is in the target set
+                return set(state[1]) == targets # check if crate set is in the target set
             
             def doMove(state, move):
                 dy, dx = move
@@ -62,7 +62,7 @@ class SokoBot:
 
             def dfsID(depthLimit): # main algorithm
                 start = (player, initialCrates) # starting state
-                stack = [(start), []] # state and path
+                stack = [(start, [])] # state and path
                 visited = {start} # set of visited states
 
                 while stack:
@@ -77,18 +77,26 @@ class SokoBot:
                     if len(path) < depthLimit: # only do til depth limit
                         for move in MOVES:
                             child = doMove(state, move) # next move
-                            if child is not None and not visited: # if valid move and not yet visited
+                            if child is not None and child not in visited: # if valid move and not yet visited
                                 visited.add(child)
                                 stack.append((child, path+[MOVE_CHARS[move]])) # add the new state and built path
-                                
+
                 return None # did not find solution
 
+            maxDepth = width*height*len(initialCrates)
+            for depthLimit in range(1, maxDepth + 1): # loop to simulate iterative deepening
+                if time.time() - startTime > TIME_LIMIT: 
+                    return "" # ran out of time
 
+                result = dfsID(depthLimit)
+                if result is not None: # check if solution found
+                    return "".join(result) # return translated solution
 
-                            
-        except Exception as ex:
+            return "" # return no moves if algo didnt work 
+           
+        except Exception as ex: # catch block just in case
             print(ex)
             
-        return "lrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlrlr"
+        return "lr"
 
     
