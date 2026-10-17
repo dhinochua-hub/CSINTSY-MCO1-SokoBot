@@ -139,14 +139,13 @@ class IDAStarSolver:
         # : BFS for player.
         # Do not walk through walls or boxes. Return:
         #   (reachable_positions, path_to_position)
-        raise NotImplementedError("Group member TODO: implement reachable BFS")
+    
 
     def _heuristic(self, boxes, goals):
         # Return a lower-bound estimate for remaining crate pushes.
         # : Implement a box-to-goal heuristic.
         # Return 0 when there are no boxes
         # f(n) = g(n) + h(n).
-        raise NotImplementedError("Group member TODO: implement heuristic")
 
     def _is_deadlock(self, box, goals, walls):
         if box in goals:
