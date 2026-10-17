@@ -135,17 +135,17 @@ class IDAStarSolver:
         return next_threshold
 
     def _reachable(self, player, boxes, walls):
-        """Return walkable player positions and paths to those positions."""
-        # TODO: Implement breadth-first search from ``player``.
-        # Do not walk through ``walls`` or ``boxes``. Return:
+        # Where player can walk
+        # : BFS for player.
+        # Do not walk through walls or boxes. Return:
         #   (reachable_positions, path_to_position)
         raise NotImplementedError("Group member TODO: implement reachable BFS")
 
     def _heuristic(self, boxes, goals):
-        """Return a lower-bound estimate for remaining crate pushes."""
-        # TODO: Implement a box-to-goal heuristic.
-        # It must return 0 when there are no boxes and a numeric lower bound
-        # otherwise. The search uses this value as f(n) = g(n) + h(n).
+        # Return a lower-bound estimate for remaining crate pushes.
+        # : Implement a box-to-goal heuristic.
+        # Return 0 when there are no boxes
+        # f(n) = g(n) + h(n).
         raise NotImplementedError("Group member TODO: implement heuristic")
 
     def _is_deadlock(self, box, goals, walls):
