@@ -135,40 +135,18 @@ class IDAStarSolver:
         return next_threshold
 
     def _reachable(self, player, boxes, walls):
-        queue = [player]
-        paths = {player: ""}
-        for current in queue:
-            for row_delta, column_delta, direction in self.DIRECTIONS:
-                target = (current[0] + row_delta, current[1] + column_delta)
-                if target in paths or target in walls or target in boxes:
-                    continue
-                paths[target] = paths[current] + direction
-                queue.append(target)
-        return paths.keys(), paths
+        """Return walkable player positions and paths to those positions."""
+        # TODO: Implement breadth-first search from ``player``.
+        # Do not walk through ``walls`` or ``boxes``. Return:
+        #   (reachable_positions, path_to_position)
+        raise NotImplementedError("Group member TODO: implement reachable BFS")
 
     def _heuristic(self, boxes, goals):
-        """Return the minimum Manhattan-distance box-to-goal assignment."""
-        if not boxes:
-            return 0
-
-        boxes = tuple(boxes)
-        goals = tuple(goals)
-        scores = {0: 0}
-        for box in boxes:
-            next_scores = {}
-            for used_goals, score in scores.items():
-                for goal_index, goal in enumerate(goals):
-                    bit = 1 << goal_index
-                    if used_goals & bit:
-                        continue
-                    mask = used_goals | bit
-                    distance = abs(box[0] - goal[0]) + abs(box[1] - goal[1])
-                    next_scores[mask] = min(
-                        next_scores.get(mask, float("inf")),
-                        score + distance,
-                    )
-            scores = next_scores
-        return min(scores.values(), default=float("inf"))
+        """Return a lower-bound estimate for remaining crate pushes."""
+        # TODO: Implement a box-to-goal heuristic.
+        # It must return 0 when there are no boxes and a numeric lower bound
+        # otherwise. The search uses this value as f(n) = g(n) + h(n).
+        raise NotImplementedError("Group member TODO: implement heuristic")
 
     def _is_deadlock(self, box, goals, walls):
         if box in goals:
