@@ -142,11 +142,15 @@ class IDAStarSolver:
     
 
     def _heuristic(self, boxes, goals):
-        # Return a lower-bound estimate for remaining crate pushes.
-        # : Implement a box-to-goal heuristic.
-        # Return 0 when there are no boxes
-        # f(n) = g(n) + h(n).
+        # Uses Manhattan Distance
+        if not boxes or not goals:
+            return 0
+        total_distance = 0
 
+        for box in boxes:
+            total_distance += min(abs (box[0] - goal[0]) + abs (box[1] - goal[1])
+                                    for goal in goals)
+        return total_distance
     def _is_deadlock(self, box, goals, walls):
         if box in goals:
             return False
