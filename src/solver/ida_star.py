@@ -1,6 +1,5 @@
 import time
 
-
 class IDAStarSolver:
 
     DIRECTIONS = (
@@ -42,7 +41,7 @@ class IDAStarSolver:
         if player is None or len(boxes) != len(goals) or boxes <= goals:
             return ""
 
-        deadline = time.perf_counter() + 9.5
+        deadline = time.perf_counter() + 14.5
         threshold = self._heuristic(boxes, goals)
         path = []
 
@@ -84,6 +83,7 @@ class IDAStarSolver:
         active_states.add(state)
 
         reachable, walking_paths = self._reachable(player, boxes, walls)
+
         candidates = []
         for box in boxes:
             for row_delta, column_delta, direction in self.DIRECTIONS:
@@ -135,12 +135,23 @@ class IDAStarSolver:
         return next_threshold
 
     def _reachable(self, player, boxes, walls):
-        # Where player can walk
-        # : BFS for player.
-        # Do not walk through walls or boxes. Return:
-        #   (reachable_positions, path_to_position)
-    
+        walking_paths = {player: []}
+        queue = [player]
+        head = 0
+        while head < len(queue):
+            current = queue[head]
+            head += 1
+            for dr, dc, direction in self.DIRECTIONS:
+                next = (current[0] + dr, current[1] + dc)
+                if next in walking_paths:
+                    continue
+                if next in walls or next in boxes:
+                    continue
+                walking_paths[next] = walking_paths[current] + [direction]
+                queue.append(next)
 
+        return set(walking_paths), walking_paths
+            
     def _heuristic(self, boxes, goals):
         # Uses Manhattan Distance
         if not boxes or not goals:
@@ -156,14 +167,9 @@ class IDAStarSolver:
             return False
 
         row, column = box
-        vertical_wall = (
-            (row - 1, column) in walls or (row + 1, column) in walls
-        )
-        horizontal_wall = (
-            (row, column - 1) in walls or (row, column + 1) in walls
-        )
-        if vertical_wall and not any(goal[1] == column for goal in goals):
-            return True
-        if horizontal_wall and not any(goal[0] == row for goal in goals):
-            return True
-        return vertical_wall and horizontal_wall
+        up = (row-1, column) in walls
+        down = (row+1, column) in walls
+        left = (row, column-1) in walls
+        right = (row, column+1) in walls
+
+        return (up or down) and (left or right)
