@@ -1,27 +1,44 @@
 import heapq
+from collections import deque
 
 
 class AStarSearch:
+    DIRECTIONS = [(-1, 0, "u"), (1, 0, "d"), (0, -1, "l"), (0, 1, "r")]
 
 # this function scans deadlock spaces (corners)
+# using backwards bfs
 
     def scan_deadlock (self, width, height, walls, targets):
-        deadlock_spaces = set() 
+        visited_boxes = set()
+        queue = deque()
 
-        for row in range(height): 
-            for col in range(width):
-                if (row,col) in walls or (row,col) in targets:
+        for target in targets: # put a box on every goal
+            visited_boxes.add(target)
+            queue.append(target)
+        
+        while queue: #pull the boxes
+            row, col = queue.popleft()
+
+            for new_row, new_col, char in self.DIRECTIONS:
+                new_box = (row - new_row, col - new_col) # former position of the box before
+                player = (row - 2 * new_row, col - 2 * new_col) # player position for pushing the box
+                if not (0 <= new_box[0] < height and 0 <= new_box[0] < width) or new_box in walls:
                     continue
+                if not (0 <= player[0] < height and 0 <= player[0] < width) or player in walls:
+                    continue
+                if new_box not in visited_boxes:
+                    visited_boxes.add(new_box)
+                    queue.append(new_box)
 
-                up = (row == 0) or (row - 1, col) in walls
-                down = (row == height - 1) or (row + 1, col) in walls
-                left = (col == 0) or (row, col-1) in walls
-                right = (col == width-1) or (row, col+1)  in walls
-
-                if (up and left) or (up and right) or (down and left) or (down and right):
-                    deadlock_spaces.add((row,col))
+        deadlock_spaces = set()
+        for row in range(height):
+            for col in range (width):
+                pos = (row,col)
+                if pos not in walls and pos not in visited_boxes:
+                    deadlock_spaces.add(pos)
         return deadlock_spaces
-
+        
+        
 # this function builds the starting locations of the crates, player and goal
 
     def start_game(self, width, height, mapData, itemsData):
@@ -77,8 +94,6 @@ class AStarSearch:
         heapq.heappush(frontier, (f, g, player, crates, "")) # push the starting state
         visited[initial_hash] = g # map the initial cost to the starting state
 
-        possible_moves = [(-1,0, "u"), (1,0, "d"), (0,-1,"l"), (0,1,"r")]
-
         while frontier:
             f, g, current_player, current_crates, path = heapq.heappop(frontier) # pop the state and mark it as the current state
             crates_set = set(current_crates) 
@@ -88,7 +103,7 @@ class AStarSearch:
                 return path
 
             # find the next positions you can move into (next states)
-            for row, col, move in possible_moves:
+            for row, col, move in self.DIRECTIONS:
                 new_row, new_col = current_player[0] + row, current_player[1] + col
 
                 # check out of bounds or if the path leads to a wall
@@ -137,4 +152,3 @@ class AStarSearch:
 
 
         
-
