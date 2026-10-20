@@ -1,5 +1,5 @@
 import time
-
+from collections import deque 
 class IDAStarSolver:
 
     DIRECTIONS = (
@@ -40,6 +40,7 @@ class IDAStarSolver:
 
         if player is None or len(boxes) != len(goals) or boxes <= goals:
             return ""
+        self._is_deadlock = self._is_deadlock(width, height, goals, walls)
 
         deadline = time.perf_counter() + 14.5
         threshold = self._heuristic(boxes, goals)
@@ -93,8 +94,7 @@ class IDAStarSolver:
                     continue
                 if destination in walls or destination in boxes:
                     continue
-                if self._is_deadlock(destination, goals, walls):
-                    continue
+                
 
                 walking_path = walking_paths[stand]
                 new_boxes = (boxes - {box}) | {destination}
@@ -162,14 +162,32 @@ class IDAStarSolver:
             total_distance += min(abs (box[0] - goal[0]) + abs (box[1] - goal[1])
                                     for goal in goals)
         return total_distance
-    def _is_deadlock(self, box, goals, walls):
-        if box in goals:
-            return False
+    def _is_deadlock(self, height, width, goals, walls):
+        visited_boxes = set()
+        queue = deque()
 
-        row, column = box
-        up = (row-1, column) in walls
-        down = (row+1, column) in walls
-        left = (row, column-1) in walls
-        right = (row, column+1) in walls
+        for goal in goals: # put a box on every goal
+            visited_boxes.add(goal)
+            queue.append(goal)
+        
+        while queue: #pull the boxes
+            row, col = queue.popleft()
 
-        return (up or down) and (left or right)
+            for new_row, new_col, char in self.DIRECTIONS:
+                new_box = (row - new_row, col - new_col) # former position of the box before it got pushed
+                player = (row - 2 * new_row, col - 2 * new_col) # player position for pulling the box
+                if not (0 <= new_box[0] < height and 0 <= new_box[1] < width) or new_box in walls:
+                    continue
+                if not (0 <= player[0] < height and 0 <= player[1] < width) or player in walls:
+                    continue
+                if new_box not in visited_boxes:
+                    visited_boxes.add(new_box)
+                    queue.append(new_box)
+
+        deadlock_spaces = set()
+        for row in range(height):
+            for col in range (width):
+                pos = (row,col)
+                if pos not in walls and pos not in visited_boxes:
+                    deadlock_spaces.add(pos)
+        return deadlock_spaces
