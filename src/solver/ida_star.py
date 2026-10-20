@@ -1,193 +1,246 @@
+import heapq
 import time
-from collections import deque 
-class IDAStarSolver:
+from collections import deque
 
-    DIRECTIONS = (
-        (-1, 0, "u"),
-        (1, 0, "d"),
-        (0, -1, "l"),
-        (0, 1, "r"),
-    )
 
-    def solve(self, width, height, map_data, items_data):
-        walls = {
-            (row, column)
-            for row in range(height)
-            for column in range(width)
-            if map_data[row][column] == "#"
-        }
-        goals = frozenset(
-            (row, column)
-            for row in range(height)
-            for column in range(width)
-            if map_data[row][column] == "."
-        )
-        boxes = frozenset(
-            (row, column)
-            for row in range(height)
-            for column in range(width)
-            if items_data[row][column] == "$"
-        )
-        player = next(
-            (
-                (row, column)
-                for row in range(height)
-                for column in range(width)
-                if items_data[row][column] == "@"
-            ),
-            None,
-        )
+class AStarSearch:
+    TIME_LIMIT = 15.0
+    DIRECTIONS = [(-1, 0, "u"), (1, 0, "d"), (0, -1, "l"), (0, 1, "r")]
 
-        if player is None or len(boxes) != len(goals) or boxes <= goals:
-            return ""
-        self._is_deadlock = self._is_deadlock(width, height, goals, walls)
+# pulls a box backwards from every target using bfs
+# the number of pulls to reach a space is the least number of pushes needed to bring a box from that space to the target
 
-        deadline = time.perf_counter() + 14.5
-        threshold = self._heuristic(boxes, goals)
-        path = []
+    def scan_push_distances(self, width, height, walls, targets):
+        push_distances = {} # stores the distances of every space for each target
 
-        while time.perf_counter() < deadline:
-            result = self._search(
-                player, boxes, goals, walls, threshold, 0, path, set(), deadline
-            )
-            if result is True:
-                return "".join(path)
-            if result == float("inf"):
-                return ""
-            threshold = result
-        return ""
+        for target in targets: # put a box on the target
+            distances = {target: 0}
+            queue = deque([target])
 
-    def _search(
-        self,
-        player,
-        boxes,
-        goals,
-        walls,
-        threshold,
-        cost,
-        path,
-        active_states,
-        deadline,
-    ):
-        if time.perf_counter() >= deadline:
-            return float("inf")
-        if boxes <= goals:
-            return True
+            while queue: # pull the box
+                row, col = queue.popleft()
 
-        estimate = cost + self._heuristic(boxes, goals)
-        if estimate > threshold:
-            return estimate
+                for new_row, new_col, char in self.DIRECTIONS:
+                    new_box = (row - new_row, col - new_col) # former position of the box before
+                    player = (row - 2 * new_row, col - 2 * new_col) # player position for pushing the box
+                    if not (0 <= new_box[0] < height and 0 <= new_box[1] < width) or new_box in walls:
+                        continue
+                    if not (0 <= player[0] < height and 0 <= player[1] < width) or player in walls:
+                        continue
+                    if new_box not in distances:
+                        distances[new_box] = distances[(row, col)] + 1
+                        queue.append(new_box)
 
-        state = (player, boxes)
-        if state in active_states:
-            return float("inf")
-        active_states.add(state)
+            push_distances[target] = distances
+        return push_distances
 
-        reachable, walking_paths = self._reachable(player, boxes, walls)
+# this function scans deadlock spaces 
+# using backwards bfs 
 
-        candidates = []
-        for box in boxes:
-            for row_delta, column_delta, direction in self.DIRECTIONS:
-                stand = (box[0] - row_delta, box[1] - column_delta)
-                destination = (box[0] + row_delta, box[1] + column_delta)
-                if stand not in reachable:
-                    continue
-                if destination in walls or destination in boxes:
-                    continue
-                
-
-                walking_path = walking_paths[stand]
-                new_boxes = (boxes - {box}) | {destination}
-                move_cost = len(walking_path) + 1
-                candidates.append(
-                    (
-                        cost + move_cost + self._heuristic(new_boxes, goals),
-                        walking_path,
-                        direction,
-                        box,
-                        new_boxes,
-                        move_cost,
-                    )
-                )
-
-        candidates.sort(key=lambda candidate: candidate[0])
-        next_threshold = float("inf")
-        for _, walking_path, direction, box, new_boxes, move_cost in candidates:
-            path.extend(walking_path)
-            path.append(direction)
-            result = self._search(
-                box,
-                frozenset(new_boxes),
-                goals,
-                walls,
-                threshold,
-                cost + move_cost,
-                path,
-                active_states,
-                deadline,
-            )
-            if result is True:
-                return True
-            del path[-(len(walking_path) + 1) :]
-            next_threshold = min(next_threshold, result)
-
-        active_states.remove(state)
-        return next_threshold
-
-    def _reachable(self, player, boxes, walls):
-        walking_paths = {player: []}
-        queue = [player]
-        head = 0
-        while head < len(queue):
-            current = queue[head]
-            head += 1
-            for dr, dc, direction in self.DIRECTIONS:
-                next = (current[0] + dr, current[1] + dc)
-                if next in walking_paths:
-                    continue
-                if next in walls or next in boxes:
-                    continue
-                walking_paths[next] = walking_paths[current] + [direction]
-                queue.append(next)
-
-        return set(walking_paths), walking_paths
-            
-    def _heuristic(self, boxes, goals):
-        # Uses Manhattan Distance
-        if not boxes or not goals:
-            return 0
-        total_distance = 0
-
-        for box in boxes:
-            total_distance += min(abs (box[0] - goal[0]) + abs (box[1] - goal[1])
-                                    for goal in goals)
-        return total_distance
-    def _is_deadlock(self, height, width, goals, walls):
-        visited_boxes = set()
-        queue = deque()
-
-        for goal in goals: # put a box on every goal
-            visited_boxes.add(goal)
-            queue.append(goal)
-        
-        while queue: #pull the boxes
-            row, col = queue.popleft()
-
-            for new_row, new_col, char in self.DIRECTIONS:
-                new_box = (row - new_row, col - new_col) # former position of the box before it got pushed
-                player = (row - 2 * new_row, col - 2 * new_col) # player position for pulling the box
-                if not (0 <= new_box[0] < height and 0 <= new_box[1] < width) or new_box in walls:
-                    continue
-                if not (0 <= player[0] < height and 0 <= player[1] < width) or player in walls:
-                    continue
-                if new_box not in visited_boxes:
-                    visited_boxes.add(new_box)
-                    queue.append(new_box)
-
+    def scan_deadlock (self, width, height, walls, push_distances):
         deadlock_spaces = set()
         for row in range(height):
             for col in range (width):
                 pos = (row,col)
-                if pos not in walls and pos not in visited_boxes:
+                if pos not in walls and all(pos not in distances for distances in push_distances.values()):
                     deadlock_spaces.add(pos)
         return deadlock_spaces
+
+
+# this function builds the starting locations of the crates, player and goal
+
+    def start_game(self, width, height, mapData, itemsData):
+        player = None
+        crates = set()
+        walls = set()
+        targets = set()
+
+
+        for row in range(height):
+            for col in range(width):
+                item = itemsData[row][col]
+                map = mapData[row][col]
+
+                if item =="@":
+                    player = (row, col)
+                elif item == "$":
+                    crates.add((row,col))
+
+                if map == "#":
+                    walls.add((row,col))
+                elif map == ".":
+                    targets.add((row,col))
+        crates_hash = tuple(sorted(crates))
+
+        self.push_distances = self.scan_push_distances(width, height, walls, targets)
+        deadlock_spaces = self.scan_deadlock(width, height, walls, self.push_distances)
+
+        # stores the distance from each space to its nearest target so the heuristic doesn't have to search for it every time
+        self.nearest_target = {
+            (row, col): min((distances.get((row, col), float("inf")) for distances in self.push_distances.values()), default=float("inf"))
+            for row in range(height)
+            for col in range(width)
+        }
+
+        return player, crates_hash, targets, walls, deadlock_spaces
+
+# computes the heuristic using the push distances instead of the manhattan distance so that the walls are taken into account
+# every crate needs to reach a target and every target needs a crate, so the bigger of the two totals is used
+# every push moves a crate by only one space
+
+    def push_distance(self, crates):
+        if crates in self.heuristic_cache:
+            return self.heuristic_cache[crates]
+
+        crate_total = 0 # stores the total of the distances from each crate to its nearest target
+        for crate in crates:
+            crate_total += self.nearest_target[crate]
+
+        target_total = 0 # stores the total of the distances from each target to its nearest crate
+        for distances in self.push_distances.values():
+            target_total += min(distances.get(crate, float("inf")) for crate in crates)
+
+        total_distance = max(crate_total, target_total)
+        self.heuristic_cache[crates] = total_distance
+        return total_distance
+
+# finds every space the player can walk to without pushing a crate using bfs
+# each space stores the space before it and the move used, so the walking path can be rebuilt
+
+    def reachable(self, player, crates_set, walls):
+        parents = {player: None}
+        queue = deque([player])
+
+        while queue:
+            current = queue.popleft()
+            for row, col, move in self.DIRECTIONS:
+                next_space = (current[0] + row, current[1] + col)
+                if next_space in parents or next_space in walls or next_space in crates_set:
+                    continue
+                parents[next_space] = (current, move)
+                queue.append(next_space)
+        return parents
+
+# rebuilds the walking path to a space by following the stored spaces backwards
+
+    def walking_path(self, parents, space):
+        path = []
+        while parents[space] is not None:
+            space, move = parents[space]
+            path.append(move)
+        path.reverse()
+        return "".join(path)
+
+# checks if the pushed crate is stuck in a 2x2 block of walls and crates
+# it is a deadlock unless all of them are on targets
+
+    def is_frozen(self, crate, crates_set, walls, targets):
+        row, col = crate
+        for row_offset in (-1, 0):
+            for col_offset in (-1, 0):
+                block = [(row + row_offset + r, col + col_offset + c) for r in (0, 1) for c in (0, 1)]
+                if all(space in walls or space in crates_set for space in block):
+                    if any(space in crates_set and space not in targets for space in block):
+                        return True
+        return False
+
+# rebuilds the whole solution by following the states back to the start
+
+    def build_path(self, came_from, state_hash):
+        moves = []
+        while came_from[state_hash] is not None:
+            state_hash, step = came_from[state_hash]
+            moves.append(step)
+        moves.reverse()
+        return "".join(moves)
+
+
+    def a_star (self, width, height, mapData, itemsData):
+        start_time = time.perf_counter()
+
+        # initialize the map and items
+        player, crates, targets, walls, deadlock_spaces = self.start_game(width, height, mapData, itemsData)
+        if player is None or len(crates) != len(targets):
+            return ""
+        self.heuristic_cache = {}
+
+        g = 0 # cost, counts every move of the player (walking and pushing)
+        h = self.push_distance(crates) # heuristic
+        f = g + h # heuristic function
+
+        frontier= [] # open list, stores the frontier notes
+        visited= {} # stores the cheapest cost found for each state
+        closed = {} # closed list, stores every space of the player areas already expanded for each crate layout
+        came_from = {} # stores the previous state and the moves taken to get to each state
+        counter = 0 # breaks ties between states with the same f and h
+
+        initial_hash = (player, crates) # stores the state data as a hash key
+        heapq.heappush(frontier, (f, h, counter, g, player, crates)) # push the starting state
+        visited[initial_hash] = g # map the initial cost to the starting state
+        came_from[initial_hash] = None
+
+        while frontier:
+            if time.perf_counter() - start_time > self.TIME_LIMIT: # stop if the bot is thinking for too long
+                return ""
+
+            f, h, _, g, current_player, current_crates = heapq.heappop(frontier) # pop the state and mark it as the current state
+            current_hash = (current_player, current_crates)
+            if g > visited[current_hash]: # skip the state if a cheaper way to it was found
+                continue
+
+            # the player standing anywhere in the same area counts as the same state,
+            # so skip it if the area of the player was already expanded with these crates
+            closed_spaces = closed.setdefault(current_crates, set())
+            if current_player in closed_spaces:
+                continue
+
+            crates_set = set(current_crates)
+            parents = self.reachable(current_player, crates_set, walls)
+            closed_spaces.update(parents)
+
+            if crates_set == targets: # if the goal has been reached
+                return self.build_path(came_from, current_hash)
+
+            # every push the player can walk to is a next state
+            for crate in current_crates:
+                for row, col, move in self.DIRECTIONS:
+                    stand = (crate[0] - row, crate[1] - col) # the player has to stand behind the crate
+                    crate_new = (crate[0] + row, crate[1] + col) # where the crate ends up
+
+                    # check if the player can get behind the crate, and prune walls, crates and deadlocks
+                    if stand not in parents:
+                        continue
+                    if crate_new in walls or crate_new in crates_set or crate_new in deadlock_spaces:
+                        continue
+
+                    # update the list of crate coordinates
+                    next_crates_set = set(crates_set)
+                    next_crates_set.remove(crate)
+                    next_crates_set.add(crate_new)
+                    if self.is_frozen(crate_new, next_crates_set, walls, targets):
+                        continue
+
+                    # convert it back to a tuple
+                    next_crates = tuple(sorted(next_crates_set))
+                    # new player position will be where the crate was
+                    next_player = crate
+                    if next_crates in closed and next_player in closed[next_crates]:
+                        continue
+
+                    # get the new state and heuristic function
+                    next_h = self.push_distance(next_crates)
+                    if next_h == float("inf"):
+                        continue
+                    walk = self.walking_path(parents, stand)
+                    next_g = g + len(walk) + 1
+                    next_f = next_g + next_h
+                    next_state_hash = (next_player, next_crates)
+
+                    # if the next state hasn't been visited or if there is a cheaper cost going towards it
+                    if next_state_hash not in visited or next_g < visited[next_state_hash]:
+                        visited[next_state_hash] = next_g # mark the new cost
+                        came_from[next_state_hash] = (current_hash, walk + move)
+
+                        counter += 1
+                        heapq.heappush(frontier, (next_f, next_h, counter, next_g, next_player, next_crates)) # push the new state to the frontier
+        return ""
