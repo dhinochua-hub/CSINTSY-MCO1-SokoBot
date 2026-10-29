@@ -4,8 +4,10 @@ from collections import deque
 
 
 class AStarSearch:
-    TIME_LIMIT = 15.0
     DIRECTIONS = [(-1, 0, "u"), (1, 0, "d"), (0, -1, "l"), (0, 1, "r")]
+    TIME_LIMIT = 14 # total thinking time, stays under the 15 second limit 
+    A_STAR_TIME = 1.5 # thinking time for A* before switching to GBFS
+    greedy = False # True makes the search ignore path cost and only follow the heuristic (GBFS)
 
 # pulls a box backwards from every target using bfs
 # the number of pulls to reach a space is the least number of pushes needed to bring a box from that space to the target
@@ -155,6 +157,27 @@ class AStarSearch:
         return "".join(moves)
 
 
+# A* orders the frontier by f = g + h
+# GBFS orders it by h, and states with the same h are broken by the cheaper cost g
+
+    def priority(self, g, h):
+        if self.greedy:
+            return (h, g)
+        return g + h
+
+# checks if a state can never be solved, used by other searches to add their own deadlock checks
+
+    def is_dead_state(self, parents, crates_set):
+        return False
+
+# extra next states made of several pushes at once, used by other searches to add their own macro moves
+
+    def macro_pushes(self, player, crates_set, parents, walls, targets, deadlock_spaces):
+        return []
+
+# runs A* first since it finds the shortest solutions,
+# then switches to GBFS for the remaining time if A* takes too long
+
     def a_star (self, width, height, mapData, itemsData):
         start_time = time.perf_counter()
 
@@ -164,9 +187,20 @@ class AStarSearch:
             return ""
         self.heuristic_cache = {}
 
+        self.greedy = False
+        path = self.search(player, crates, targets, walls, deadlock_spaces, start_time + self.A_STAR_TIME)
+        if path is None: # A* ran out of time
+            self.greedy = True
+            path = self.search(player, crates, targets, walls, deadlock_spaces, start_time + self.TIME_LIMIT)
+        return path or ""
+
+# the search loop shared by A* and GBFS
+# returns the solution, "" if there is no solution, or None if it ran out of time
+
+    def search(self, player, crates, targets, walls, deadlock_spaces, deadline):
         g = 0 # cost, counts every move of the player (walking and pushing)
         h = self.push_distance(crates) # heuristic
-        f = g + h # heuristic function
+        f = self.priority(g, h) # heuristic function
 
         frontier= [] # open list, stores the frontier notes
         visited= {} # stores the cheapest cost found for each state
@@ -180,8 +214,8 @@ class AStarSearch:
         came_from[initial_hash] = None
 
         while frontier:
-            if time.perf_counter() - start_time > self.TIME_LIMIT: # stop if the bot is thinking for too long
-                return ""
+            if time.perf_counter() > deadline: # stop if the bot is thinking for too long
+                return None
 
             f, h, _, g, current_player, current_crates = heapq.heappop(frontier) # pop the state and mark it as the current state
             current_hash = (current_player, current_crates)
@@ -200,6 +234,10 @@ class AStarSearch:
 
             if crates_set == targets: # if the goal has been reached
                 return self.build_path(came_from, current_hash)
+            if self.is_dead_state(parents, crates_set): # skip states that can never be solved
+                continue
+
+            next_states = self.macro_pushes(current_player, crates_set, parents, walls, targets, deadlock_spaces)
 
             # every push the player can walk to is a next state
             for crate in current_crates:
@@ -227,20 +265,23 @@ class AStarSearch:
                     if next_crates in closed and next_player in closed[next_crates]:
                         continue
 
-                    # get the new state and heuristic function
-                    next_h = self.push_distance(next_crates)
-                    if next_h == float("inf"):
-                        continue
                     walk = self.walking_path(parents, stand)
-                    next_g = g + len(walk) + 1
-                    next_f = next_g + next_h
-                    next_state_hash = (next_player, next_crates)
+                    next_states.append((next_player, next_crates, walk + move))
 
-                    # if the next state hasn't been visited or if there is a cheaper cost going towards it
-                    if next_state_hash not in visited or next_g < visited[next_state_hash]:
-                        visited[next_state_hash] = next_g # mark the new cost
-                        came_from[next_state_hash] = (current_hash, walk + move)
+            for next_player, next_crates, moves in next_states:
+                # get the new state and heuristic function
+                next_h = self.push_distance(next_crates)
+                if next_h == float("inf"):
+                    continue
+                next_g = g + len(moves)
+                next_f = self.priority(next_g, next_h)
+                next_state_hash = (next_player, next_crates)
 
-                        counter += 1
-                        heapq.heappush(frontier, (next_f, next_h, counter, next_g, next_player, next_crates)) # push the new state to the frontier
+                # if the next state hasn't been visited or if there is a cheaper cost going towards it
+                if next_state_hash not in visited or next_g < visited[next_state_hash]:
+                    visited[next_state_hash] = next_g # mark the new cost
+                    came_from[next_state_hash] = (current_hash, moves)
+
+                    counter += 1
+                    heapq.heappush(frontier, (next_f, next_h, counter, next_g, next_player, next_crates)) # push the new state to the frontier
         return ""
